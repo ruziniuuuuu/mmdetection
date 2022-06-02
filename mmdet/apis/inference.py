@@ -146,13 +146,16 @@ def inference_detector(model, imgs):
             ), 'CPU inference with RoIPool is not supported currently.'
 
     # forward the model
-    with torch.no_grad():
-        results = model(return_loss=False, rescale=True, **data)
+    # with torch.no_grad():
+    #     results = model(return_loss=False, rescale=True, **data)
+    _ = model(return_loss=False, rescale=True, **data)[0]           # for visualization
+    results = model(return_loss=False, rescale=True, **data)[1][0]   # for visualization
 
     if not is_batch:
-        return results[0]
+        return _, results[0]
     else:
-        return results
+        # return results
+        return _, results
 
 
 async def async_inference_detector(model, imgs):

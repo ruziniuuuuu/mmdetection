@@ -14,6 +14,7 @@ from mmdet.core import DistEvalHook, EvalHook
 from mmdet.datasets import (build_dataloader, build_dataset,
                             replace_ImageToTensor)
 from mmdet.utils import find_latest_checkpoint, get_root_logger
+from mmdet.utils import Visualizer
 
 
 def init_random_seed(seed=None, device='cuda'):
@@ -194,6 +195,10 @@ def train_detector(model,
         # priority of IterTimerHook has been modified from 'NORMAL' to 'LOW'.
         runner.register_hook(
             eval_hook(val_dataloader, **eval_cfg), priority='LOW')
+        
+        vis_hook = Visualizer
+        runner.register_hook(vis_hook(val_dataloader, **eval_cfg))
+
 
     resume_from = None
     if cfg.resume_from is None and cfg.get('auto_resume'):
