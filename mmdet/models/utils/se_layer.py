@@ -5,14 +5,17 @@ import torch.nn as nn
 from mmcv.cnn import ConvModule
 from mmcv.runner import BaseModule
 
+from mmcv.cnn import PLUGIN_LAYERS
 
+
+@PLUGIN_LAYERS.register_module()
 class SELayer(BaseModule):
     """Squeeze-and-Excitation Module.
 
     Args:
-        channels (int): The input (and output) channels of the SE layer.
+        in_channels (int): The input (and output) in_channels of the SE layer.
         ratio (int): Squeeze ratio in SELayer, the intermediate channel will be
-            ``int(channels/ratio)``. Default: 16.
+            ``int(in_channels/ratio)``. Default: 16.
         conv_cfg (None or dict): Config dict for convolution layer.
             Default: None, which means using conv2d.
         act_cfg (dict or Sequence[dict]): Config dict for activation layer.
@@ -26,7 +29,7 @@ class SELayer(BaseModule):
     """
 
     def __init__(self,
-                 channels,
+                 in_channels,
                  ratio=16,
                  conv_cfg=None,
                  act_cfg=(dict(type='ReLU'), dict(type='Sigmoid')),
@@ -38,15 +41,15 @@ class SELayer(BaseModule):
         assert mmcv.is_tuple_of(act_cfg, dict)
         self.global_avgpool = nn.AdaptiveAvgPool2d(1)
         self.conv1 = ConvModule(
-            in_channels=channels,
-            out_channels=int(channels / ratio),
+            in_channels=in_channels,
+            out_channels=int(in_channels / ratio),
             kernel_size=1,
             stride=1,
             conv_cfg=conv_cfg,
             act_cfg=act_cfg[0])
         self.conv2 = ConvModule(
-            in_channels=int(channels / ratio),
-            out_channels=channels,
+            in_channels=int(in_channels / ratio),
+            out_channels=in_channels,
             kernel_size=1,
             stride=1,
             conv_cfg=conv_cfg,
@@ -68,9 +71,9 @@ class DyReLU(BaseModule):
     https://github.com/microsoft/DynamicHead/blob/master/dyhead/dyrelu.py
 
     Args:
-        channels (int): The input (and output) channels of DyReLU module.
+        in_channels (int): The input (and output) in_channels of DyReLU module.
         ratio (int): Squeeze ratio in Squeeze-and-Excitation-like module,
-            the intermediate channel will be ``int(channels/ratio)``.
+            the intermediate channel will be ``int(in_channels/ratio)``.
             Default: 4.
         conv_cfg (None or dict): Config dict for convolution layer.
             Default: None, which means using conv2d.
@@ -86,7 +89,7 @@ class DyReLU(BaseModule):
     """
 
     def __init__(self,
-                 channels,
+                 in_channels,
                  ratio=4,
                  conv_cfg=None,
                  act_cfg=(dict(type='ReLU'),
@@ -97,19 +100,19 @@ class DyReLU(BaseModule):
             act_cfg = (act_cfg, act_cfg)
         assert len(act_cfg) == 2
         assert mmcv.is_tuple_of(act_cfg, dict)
-        self.channels = channels
+        self.in_channels = in_channels
         self.expansion = 4  # for a1, b1, a2, b2
         self.global_avgpool = nn.AdaptiveAvgPool2d(1)
         self.conv1 = ConvModule(
-            in_channels=channels,
-            out_channels=int(channels / ratio),
+            in_channels=in_channels,
+            out_channels=int(in_channels / ratio),
             kernel_size=1,
             stride=1,
             conv_cfg=conv_cfg,
             act_cfg=act_cfg[0])
         self.conv2 = ConvModule(
-            in_channels=int(channels / ratio),
-            out_channels=channels * self.expansion,
+            in_channels=int(in_channels / ratio),
+            out_channels=in_channels * self.expansion,
             kernel_size=1,
             stride=1,
             conv_cfg=conv_cfg,
@@ -120,7 +123,7 @@ class DyReLU(BaseModule):
         coeffs = self.global_avgpool(x)
         coeffs = self.conv1(coeffs)
         coeffs = self.conv2(coeffs) - 0.5  # value range: [-0.5, 0.5]
-        a1, b1, a2, b2 = torch.split(coeffs, self.channels, dim=1)
+        a1, b1, a2, b2 = torch.split(coeffs, self.in_channels, dim=1)
         a1 = a1 * 2.0 + 1.0  # [-1.0, 1.0] + 1.0
         a2 = a2 * 2.0  # [-1.0, 1.0]
         out = torch.max(x * a1 + b1, x * a2 + b2)
